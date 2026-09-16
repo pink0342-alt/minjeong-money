@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fff4f8">
+<title>민정머니</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div><h1>민정머니 💸</h1><small id="syncStatus">로컬 모드</small></div>
+</header>
+
+<main>
+<section id="home" class="page active">
+  <div class="hero card">
+    <div><span>이번 주 남은 돈</span><strong id="weekRemain">0원</strong></div>
+    <div><span>오늘 써도 되는 돈</span><strong id="todaySpendable">0원</strong></div>
+    <small id="weekRange"></small>
+  </div>
+  <div class="card">
+    <h2>빠른 지출 입력</h2>
+    <input id="amount" type="number" inputmode="numeric" min="1" placeholder="금액 (1원부터)">
+    <div class="row">
+      <input id="date" type="date">
+      <select id="category"></select>
+    </div>
+    <input id="memo" placeholder="메모 (선택)">
+    <div class="seg">
+      <button class="active" data-kind="weekly">주간 생활비</button>
+      <button data-kind="pot">월간 별도항목</button>
+    </div>
+    <select id="potSelect" class="hidden"></select>
+    <button class="primary" id="addExpense">지출 등록</button>
+  </div>
+  <div class="card">
+    <h2>최근 지출</h2>
+    <div id="recent"></div>
+  </div>
+</section>
+
+<section id="calendar" class="page">
+  <div class="card">
+    <div class="monthHead"><button id="prevMonth">‹</button><h2 id="monthTitle"></h2><button id="nextMonth">›</button></div>
+    <div class="weekdays"><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span><span>일</span></div>
+    <div id="calendarGrid" class="calendarGrid"></div>
+  </div>
+  <div class="card"><h2>선택한 날</h2><div id="dayDetail">날짜를 눌러보세요.</div></div>
+</section>
+
+<section id="stats" class="page">
+  <div class="card">
+    <div class="monthHead"><button id="prevStats">‹</button><h2 id="statsTitle"></h2><button id="nextStats">›</button></div>
+    <div class="statBig"><span>이번 달 총지출</span><strong id="monthTotal">0원</strong></div>
+  </div>
+  <div class="card"><h2>카테고리별</h2><div id="categoryStats"></div></div>
+  <div class="card"><h2>월간 별도항목</h2><div id="potStats"></div></div>
+</section>
+
+<section id="settings" class="page">
+  <div class="card">
+    <h2>예산 설정</h2>
+    <label>주간 기본예산 (월~일)<input id="weeklyBudget" type="number" min="0" step="1000"></label>
+    <button class="primary" id="saveBudget">저장</button>
+    <small>남은 주간예산을 오늘 포함 남은 날짜 수로 나눠 ‘오늘 써도 되는 돈’을 자동 계산해요.</small>
+  </div>
+  <div class="card">
+    <h2>카테고리</h2>
+    <div class="row"><input id="newCategory" placeholder="예: 교통"><button id="addCategory">추가</button></div>
+    <div id="categoryChips" class="chips"></div>
+  </div>
+  <div class="card">
+    <h2>월간 별도항목</h2>
+    <div class="row"><input id="newPotName" placeholder="예: 미용"><input id="newPotBudget" type="number" min="0" placeholder="월 예산"></div>
+    <button id="addPot">항목 추가</button>
+    <div id="potList"></div>
+    <small>별도항목 지출은 주간 생활비를 깎지 않아요.</small>
+  </div>
+  <div class="card">
+    <h2>갤럭시 ↔ 아이패드 동기화</h2>
+    <input id="sbUrl" placeholder="Supabase Project URL">
+    <input id="sbKey" placeholder="Supabase publishable key">
+    <div class="row"><input id="syncKey" type="password" placeholder="동기화 코드"><button id="generateSyncKey">코드 생성</button></div>
+    <button id="copySyncKey">코드 복사</button>
+    <button class="primary" id="saveCloud">연결 정보 저장</button>
+    <button id="syncNow">지금 동기화</button>
+    <small>가계부 데이터는 동기화 코드로 기기에서 암호화한 뒤 저장해요. 동기화 코드는 다른 사람에게 공유하지 마세요.</small>
+  </div>
+  <div class="card">
+    <h2>백업</h2>
+    <button id="backup">백업 저장</button>
+    <label class="fileLabel">백업 복원<input id="restore" type="file" accept=".json"></label>
+  </div>
+</section>
+</main>
+
+<nav>
+<button data-page="home" class="active">🏠<span>홈</span></button>
+<button data-page="calendar">📅<span>달력</span></button>
+<button data-page="stats">📊<span>통계</span></button>
+<button data-page="settings">⚙️<span>설정</span></button>
+</nav>
+<script src="app.js"></script>
+</body></html>

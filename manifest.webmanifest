@@ -1,0 +1,16 @@
+{
+  "name": "민정머니",
+  "short_name": "민정머니",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff9fb",
+  "theme_color": "#fff4f8",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

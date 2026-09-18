@@ -30,9 +30,9 @@ function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt
 function render(){
  let a=startOfWeek(),b=endOfWeek(),spent=weeklySpent();
  $("#weekRemain").textContent=money(Math.max(0,data.weeklyBudget-spent));
- $("#todaySpendable").textContent=money(todaySpendable()); $("#monthRemain").textContent=money(monthlyRemain());
+ $("#todaySpendable").textContent=money(todaySpendable()); if($("#monthRemain"))$("#monthRemain").textContent=money(monthlyRemain());
  $("#weekRange").textContent=`${a.getMonth()+1}/${a.getDate()} ~ ${b.getMonth()+1}/${b.getDate()} · 사용 ${money(spent)} / ${money(data.weeklyBudget)}`;
- $("#weeklyBudget").value=data.weeklyBudget; $("#monthlyBudget").value=data.monthlyBudget; $("#date").value=$("#date").value||today();
+ $("#weeklyBudget").value=data.weeklyBudget; if($("#monthlyBudget"))$("#monthlyBudget").value=data.monthlyBudget; $("#date").value=$("#date").value||today();
  $("#category").innerHTML=data.categories.map(x=>`<option>${esc(x)}</option>`).join("");
  $("#potSelect").innerHTML=data.pots.length?data.pots.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(""):`<option value="">별도항목을 먼저 만들어주세요</option>`;
  $("#recent").innerHTML=data.expenses.length?data.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt).slice(0,8).map(expenseHTML).join(""):"아직 지출이 없어요.";
@@ -64,7 +64,7 @@ $$(".seg button").forEach(b=>b.onclick=()=>{kind=b.dataset.kind;$$(".seg button"
 $("#addExpense").onclick=()=>{let amount=Number($("#amount").value);if(!amount||amount<1)return alert("금액을 입력해줘!");if(kind==="pot"&&!$("#potSelect").value)return alert("월간 별도항목을 먼저 만들어줘!");
  data.expenses.push({id:crypto.randomUUID(),amount,date:$("#date").value||today(),category:$("#category").value,memo:$("#memo").value.trim(),kind,potId:kind==="pot"?$("#potSelect").value:null,createdAt:Date.now()});$("#amount").value="";$("#memo").value="";save()};
 document.addEventListener("click",e=>{let id=e.target.dataset.del;if(id){data.deletedExpenseIds=[...new Set([...(data.deletedExpenseIds||[]),id])];data.expenses=data.expenses.filter(x=>x.id!==id);save()}let dc=e.target.dataset.delcat;if(dc!==undefined&&data.categories.length>1){data.categories.splice(Number(dc),1);save()}let dp=e.target.dataset.delpot;if(dp){data.pots=data.pots.filter(x=>x.id!==dp);save()}let day=e.target.closest("[data-day]")?.dataset.day;if(day){selectedDay=day;renderCalendar()}});
-$("#saveBudget").onclick=()=>{data.weeklyBudget=Math.max(0,Number($("#weeklyBudget").value)||0);data.monthlyBudget=Math.max(0,Number($("#monthlyBudget").value)||0);save()};
+$("#saveBudget").onclick=()=>{data.weeklyBudget=Math.max(0,Number($("#weeklyBudget").value)||0);if($("#monthlyBudget"))data.monthlyBudget=Math.max(0,Number($("#monthlyBudget").value)||0);save()};
 $("#addCategory").onclick=()=>{let v=$("#newCategory").value.trim();if(v&&!data.categories.includes(v)){data.categories.push(v);$("#newCategory").value="";save()}};
 $("#addPot").onclick=()=>{let n=$("#newPotName").value.trim(),b=Number($("#newPotBudget").value)||0;if(!n)return alert("항목 이름을 입력해줘!");data.pots.push({id:crypto.randomUUID(),name:n,budget:b});$("#newPotName").value="";$("#newPotBudget").value="";save()};
 $("#prevMonth").onclick=()=>{calDate.setMonth(calDate.getMonth()-1);renderCalendar()};$("#nextMonth").onclick=()=>{calDate.setMonth(calDate.getMonth()+1);renderCalendar()};
@@ -115,7 +115,7 @@ function scheduleSync(){clearTimeout(syncTimer);if(cloud().url)syncTimer=setTime
 async function syncData(silent=false){let c=cloud();if(!c.url||!c.key||!c.syncKey){if(!silent)alert("먼저 동기화 연결 정보를 저장해줘!");return}
  try{setStatus("동기화 중…");let hash=await sha256(c.syncKey),rows=await rpc("money_sync_pull",{p_sync_key_hash:hash}),remote=Array.isArray(rows)&&rows[0]?.payload?await decryptPayload(rows[0].payload,c.syncKey):null;
  let merged=mergeData(data,remote);data=merged;localStorage.setItem(KEY,JSON.stringify(data));
- let enc=await encryptPayload(merged,c.syncKey);await rpc("money_sync_push",{p_sync_key_hash:hash,p_payload:enc});setStatus("동기화 완료");render();if(!silent)alert("동기화 완료!")}
+ let enc=await encryptPayload(merged,c.syncKey);await rpc("money_sync_push",{p_sync_key_hash:hash,p_payload:enc});setStatus("동기화 완료");try{render()}catch(renderErr){console.warn("render after sync",renderErr)}if(!silent)alert("동기화 완료!")}
  catch(e){console.error(e);setStatus("동기화 실패");if(!silent)alert("동기화에 실패했어. 기존 연결정보는 그대로 두고 다시 시도해줘. 계속 실패하면 오류를 확인할게.")}}
 $("#syncNow").onclick=()=>syncData(false);
 window.addEventListener("focus",()=>{if(cloud().url)syncData(true)});

@@ -3,7 +3,7 @@ const KEY="minjeong_money_v01", CLOUD="minjeong_money_cloud_v01";
 const money=n=>(Number(n)||0).toLocaleString("ko-KR")+"원";
 const iso=d=>{let x=new Date(d); x.setMinutes(x.getMinutes()-x.getTimezoneOffset()); return x.toISOString().slice(0,10)};
 const today=()=>iso(new Date());
-const defaults={weeklyBudget:100000,categories:["식비","카페·간식","교통","쇼핑","생활","기타"],pots:[],expenses:[],deletedExpenseIds:[],updatedAt:0};
+const defaults={weeklyBudget:100000,monthlyBudget:400000,categories:["식비","카페·간식","교통","쇼핑","생활","기타"],pots:[],expenses:[],deletedExpenseIds:[],updatedAt:0};
 let data=load(), kind="weekly", calDate=new Date(), statsDate=new Date(), selectedDay=today();
 
 function load(){try{let x={...defaults,...JSON.parse(localStorage.getItem(KEY)||"{}")};x.deletedExpenseIds=Array.isArray(x.deletedExpenseIds)?x.deletedExpenseIds:[];return x}catch{return structuredClone(defaults)}}
@@ -23,14 +23,16 @@ function todaySpendable(){
  return todayBase-todaySpent;
 }
 function monthKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
+function monthlyLivingSpent(d=new Date()){let mk=monthKey(d);return data.expenses.filter(e=>e.kind==="weekly"&&e.date.startsWith(mk)).reduce((s,e)=>s+e.amount,0)}
+function monthlyRemain(){return data.monthlyBudget-monthlyLivingSpent()}
 function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 
 function render(){
  let a=startOfWeek(),b=endOfWeek(),spent=weeklySpent();
  $("#weekRemain").textContent=money(Math.max(0,data.weeklyBudget-spent));
- $("#todaySpendable").textContent=money(todaySpendable());
+ $("#todaySpendable").textContent=money(todaySpendable()); $("#monthRemain").textContent=money(monthlyRemain());
  $("#weekRange").textContent=`${a.getMonth()+1}/${a.getDate()} ~ ${b.getMonth()+1}/${b.getDate()} · 사용 ${money(spent)} / ${money(data.weeklyBudget)}`;
- $("#weeklyBudget").value=data.weeklyBudget; $("#date").value=$("#date").value||today();
+ $("#weeklyBudget").value=data.weeklyBudget; $("#monthlyBudget").value=data.monthlyBudget; $("#date").value=$("#date").value||today();
  $("#category").innerHTML=data.categories.map(x=>`<option>${esc(x)}</option>`).join("");
  $("#potSelect").innerHTML=data.pots.length?data.pots.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(""):`<option value="">별도항목을 먼저 만들어주세요</option>`;
  $("#recent").innerHTML=data.expenses.length?data.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt).slice(0,8).map(expenseHTML).join(""):"아직 지출이 없어요.";
@@ -62,7 +64,7 @@ $$(".seg button").forEach(b=>b.onclick=()=>{kind=b.dataset.kind;$$(".seg button"
 $("#addExpense").onclick=()=>{let amount=Number($("#amount").value);if(!amount||amount<1)return alert("금액을 입력해줘!");if(kind==="pot"&&!$("#potSelect").value)return alert("월간 별도항목을 먼저 만들어줘!");
  data.expenses.push({id:crypto.randomUUID(),amount,date:$("#date").value||today(),category:$("#category").value,memo:$("#memo").value.trim(),kind,potId:kind==="pot"?$("#potSelect").value:null,createdAt:Date.now()});$("#amount").value="";$("#memo").value="";save()};
 document.addEventListener("click",e=>{let id=e.target.dataset.del;if(id){data.deletedExpenseIds=[...new Set([...(data.deletedExpenseIds||[]),id])];data.expenses=data.expenses.filter(x=>x.id!==id);save()}let dc=e.target.dataset.delcat;if(dc!==undefined&&data.categories.length>1){data.categories.splice(Number(dc),1);save()}let dp=e.target.dataset.delpot;if(dp){data.pots=data.pots.filter(x=>x.id!==dp);save()}let day=e.target.closest("[data-day]")?.dataset.day;if(day){selectedDay=day;renderCalendar()}});
-$("#saveBudget").onclick=()=>{data.weeklyBudget=Math.max(0,Number($("#weeklyBudget").value)||0);save()};
+$("#saveBudget").onclick=()=>{data.weeklyBudget=Math.max(0,Number($("#weeklyBudget").value)||0);data.monthlyBudget=Math.max(0,Number($("#monthlyBudget").value)||0);save()};
 $("#addCategory").onclick=()=>{let v=$("#newCategory").value.trim();if(v&&!data.categories.includes(v)){data.categories.push(v);$("#newCategory").value="";save()}};
 $("#addPot").onclick=()=>{let n=$("#newPotName").value.trim(),b=Number($("#newPotBudget").value)||0;if(!n)return alert("항목 이름을 입력해줘!");data.pots.push({id:crypto.randomUUID(),name:n,budget:b});$("#newPotName").value="";$("#newPotBudget").value="";save()};
 $("#prevMonth").onclick=()=>{calDate.setMonth(calDate.getMonth()-1);renderCalendar()};$("#nextMonth").onclick=()=>{calDate.setMonth(calDate.getMonth()+1);renderCalendar()};

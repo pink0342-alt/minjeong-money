@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#fff4f8">
 <title>민정머니</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=013">
 </head>
 <body>
 <header>
@@ -64,7 +64,7 @@
     <h2>예산 설정</h2>
     <label>주간 기본예산 (월~일)<input id="weeklyBudget" type="number" min="0" step="1000"></label>
     <button class="primary" id="saveBudget">저장</button>
-    <small>남은 주간예산을 오늘 포함 남은 날짜 수로 나눠 ‘오늘 써도 되는 돈’을 자동 계산해요.</small>
+    <small>오늘 시작 가능액은 오늘 이전까지의 지출을 기준으로 계산하고, 오늘 쓴 금액은 그 금액에서 바로 차감해요.</small>
   </div>
   <div class="card">
     <h2>카테고리</h2>
@@ -102,5 +102,5 @@
 <button data-page="stats">📊<span>통계</span></button>
 <button data-page="settings">⚙️<span>설정</span></button>
 </nav>
-<script src="app.js"></script>
+<script src="app.js?v=013"></script>
 </body></html>

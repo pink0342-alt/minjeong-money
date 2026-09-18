@@ -4,7 +4,7 @@ const money=n=>(Number(n)||0).toLocaleString("ko-KR")+"원";
 const iso=d=>{let x=new Date(d); x.setMinutes(x.getMinutes()-x.getTimezoneOffset()); return x.toISOString().slice(0,10)};
 const today=()=>iso(new Date());
 const defaults={weeklyBudget:100000,monthlyBudget:400000,categories:["식비","카페·간식","교통","쇼핑","생활","기타"],pots:[],expenses:[],deletedExpenseIds:[],updatedAt:0};
-let data=load(), kind="weekly", calDate=new Date(), statsDate=new Date(), selectedDay=today();
+let data=normalizeData(load()), kind="weekly", calDate=new Date(), statsDate=new Date(), selectedDay=today();
 
 function load(){try{let x={...defaults,...JSON.parse(localStorage.getItem(KEY)||"{}")};x.deletedExpenseIds=Array.isArray(x.deletedExpenseIds)?x.deletedExpenseIds:[];return x}catch{return structuredClone(defaults)}}
 function save(localOnly=false){data.updatedAt=Date.now();localStorage.setItem(KEY,JSON.stringify(data));render();if(!localOnly) scheduleSync()}
@@ -81,18 +81,33 @@ const b64=u=>btoa(String.fromCharCode(...u)), unb64=s=>Uint8Array.from(atob(s),c
 async function encryptPayload(obj,pass){let salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await deriveKey(pass,salt),plain=new TextEncoder().encode(JSON.stringify(obj)),ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,plain);return {v:1,salt:b64(salt),iv:b64(iv),cipher:b64(new Uint8Array(ct))}}
 async function decryptPayload(enc,pass){let salt=unb64(enc.salt),iv=unb64(enc.iv),key=await deriveKey(pass,salt),pt=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,unb64(enc.cipher));return JSON.parse(new TextDecoder().decode(pt))}
 async function rpc(name,args){let c=cloud(),r=await fetch(c.url+"/rest/v1/rpc/"+name,{method:"POST",headers:{"Content-Type":"application/json","apikey":c.key,"Authorization":"Bearer "+c.key},body:JSON.stringify(args)});if(!r.ok)throw new Error(await r.text());let t=await r.text();return t?JSON.parse(t):null}
+function normalizeData(x){
+ x=x||{};
+ return {...defaults,...x,
+   weeklyBudget:Number.isFinite(Number(x.weeklyBudget))?Number(x.weeklyBudget):defaults.weeklyBudget,
+   monthlyBudget:Number.isFinite(Number(x.monthlyBudget))?Number(x.monthlyBudget):defaults.monthlyBudget,
+   categories:Array.isArray(x.categories)?x.categories:defaults.categories,
+   pots:Array.isArray(x.pots)?x.pots:[],
+   expenses:Array.isArray(x.expenses)?x.expenses:[],
+   deletedExpenseIds:Array.isArray(x.deletedExpenseIds)?x.deletedExpenseIds:[],
+   updatedAt:Number(x.updatedAt||0)
+ };
+}
 function mergeData(local,remote){
- if(!remote)return {...defaults,...local,deletedExpenseIds:local.deletedExpenseIds||[]};
+ local=normalizeData(local); remote=remote?normalizeData(remote):null;
+ if(!remote)return local;
  let deleted=[...new Set([...(local.deletedExpenseIds||[]),...(remote.deletedExpenseIds||[])])];
  let map=new Map();
- [...(remote.expenses||[]),...(local.expenses||[])].forEach(e=>{if(e&&e.id&&!deleted.includes(e.id)){let prev=map.get(e.id);if(!prev||Number(e.createdAt||0)>=Number(prev.createdAt||0))map.set(e.id,e)}});
- let newer=Number(remote.updatedAt||0)>Number(local.updatedAt||0)?remote:local;
+ [...remote.expenses,...local.expenses].forEach(e=>{if(e&&e.id&&!deleted.includes(e.id)){let prev=map.get(e.id);if(!prev||Number(e.createdAt||0)>=Number(prev.createdAt||0))map.set(e.id,e)}});
+ let newer=remote.updatedAt>local.updatedAt?remote:local;
  return {...defaults,...newer,
-   categories:[...new Set([...(remote.categories||[]),...(local.categories||[])])],
-   pots:[...(remote.pots||[]),...(local.pots||[])].reduce((a,p)=>{if(p&&p.id&&!a.some(x=>x.id===p.id))a.push(p);return a},[]),
+   weeklyBudget:Number(newer.weeklyBudget||defaults.weeklyBudget),
+   monthlyBudget:Number(newer.monthlyBudget||defaults.monthlyBudget),
+   categories:[...new Set([...remote.categories,...local.categories])],
+   pots:[...remote.pots,...local.pots].reduce((a,p)=>{if(p&&p.id&&!a.some(x=>x.id===p.id))a.push(p);return a},[]),
    expenses:[...map.values()],
    deletedExpenseIds:deleted,
-   updatedAt:Math.max(Number(local.updatedAt||0),Number(remote.updatedAt||0))
+   updatedAt:Math.max(local.updatedAt,remote.updatedAt)
  };
 }
 let syncTimer;
@@ -101,7 +116,7 @@ async function syncData(silent=false){let c=cloud();if(!c.url||!c.key||!c.syncKe
  try{setStatus("동기화 중…");let hash=await sha256(c.syncKey),rows=await rpc("money_sync_pull",{p_sync_key_hash:hash}),remote=Array.isArray(rows)&&rows[0]?.payload?await decryptPayload(rows[0].payload,c.syncKey):null;
  let merged=mergeData(data,remote);data=merged;localStorage.setItem(KEY,JSON.stringify(data));
  let enc=await encryptPayload(merged,c.syncKey);await rpc("money_sync_push",{p_sync_key_hash:hash,p_payload:enc});setStatus("동기화 완료");render();if(!silent)alert("동기화 완료!")}
- catch(e){console.error(e);setStatus("동기화 실패");if(!silent)alert("동기화에 실패했어. 연결 정보와 SQL 설정을 확인해줘.")}}
+ catch(e){console.error(e);setStatus("동기화 실패");if(!silent)alert("동기화에 실패했어. 기존 연결정보는 그대로 두고 다시 시도해줘. 계속 실패하면 오류를 확인할게.")}}
 $("#syncNow").onclick=()=>syncData(false);
 window.addEventListener("focus",()=>{if(cloud().url)syncData(true)});
 

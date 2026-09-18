@@ -3,8 +3,8 @@ const KEY="minjeong_money_v01", CLOUD="minjeong_money_cloud_v01";
 const money=n=>(Number(n)||0).toLocaleString("ko-KR")+"원";
 const iso=d=>{let x=new Date(d); x.setMinutes(x.getMinutes()-x.getTimezoneOffset()); return x.toISOString().slice(0,10)};
 const today=()=>iso(new Date());
-const defaults={weeklyBudget:100000,monthlyBudget:400000,categories:["식비","카페·간식","교통","쇼핑","생활","기타"],pots:[],expenses:[],deletedExpenseIds:[],updatedAt:0};
-let data=normalizeData(load()), kind="weekly", calDate=new Date(), statsDate=new Date(), selectedDay=today();
+const defaults={weeklyBudget:100000,categories:["식비","카페·간식","교통","쇼핑","생활","기타"],pots:[],expenses:[],deletedExpenseIds:[],updatedAt:0};
+let data=load(), kind="weekly", calDate=new Date(), statsDate=new Date(), selectedDay=today();
 
 function load(){try{let x={...defaults,...JSON.parse(localStorage.getItem(KEY)||"{}")};x.deletedExpenseIds=Array.isArray(x.deletedExpenseIds)?x.deletedExpenseIds:[];return x}catch{return structuredClone(defaults)}}
 function save(localOnly=false){data.updatedAt=Date.now();localStorage.setItem(KEY,JSON.stringify(data));render();if(!localOnly) scheduleSync()}
@@ -23,16 +23,14 @@ function todaySpendable(){
  return todayBase-todaySpent;
 }
 function monthKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
-function monthlyLivingSpent(d=new Date()){let mk=monthKey(d);return data.expenses.filter(e=>e.kind==="weekly"&&e.date.startsWith(mk)).reduce((s,e)=>s+e.amount,0)}
-function monthlyRemain(){return data.monthlyBudget-monthlyLivingSpent()}
 function esc(s=""){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 
 function render(){
  let a=startOfWeek(),b=endOfWeek(),spent=weeklySpent();
  $("#weekRemain").textContent=money(Math.max(0,data.weeklyBudget-spent));
- $("#todaySpendable").textContent=money(todaySpendable()); if($("#monthRemain"))$("#monthRemain").textContent=money(monthlyRemain());
+ $("#todaySpendable").textContent=money(todaySpendable());
  $("#weekRange").textContent=`${a.getMonth()+1}/${a.getDate()} ~ ${b.getMonth()+1}/${b.getDate()} · 사용 ${money(spent)} / ${money(data.weeklyBudget)}`;
- $("#weeklyBudget").value=data.weeklyBudget; if($("#monthlyBudget"))$("#monthlyBudget").value=data.monthlyBudget; $("#date").value=$("#date").value||today();
+ $("#weeklyBudget").value=data.weeklyBudget; $("#date").value=$("#date").value||today();
  $("#category").innerHTML=data.categories.map(x=>`<option>${esc(x)}</option>`).join("");
  $("#potSelect").innerHTML=data.pots.length?data.pots.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(""):`<option value="">별도항목을 먼저 만들어주세요</option>`;
  $("#recent").innerHTML=data.expenses.length?data.expenses.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt).slice(0,8).map(expenseHTML).join(""):"아직 지출이 없어요.";
@@ -64,7 +62,7 @@ $$(".seg button").forEach(b=>b.onclick=()=>{kind=b.dataset.kind;$$(".seg button"
 $("#addExpense").onclick=()=>{let amount=Number($("#amount").value);if(!amount||amount<1)return alert("금액을 입력해줘!");if(kind==="pot"&&!$("#potSelect").value)return alert("월간 별도항목을 먼저 만들어줘!");
  data.expenses.push({id:crypto.randomUUID(),amount,date:$("#date").value||today(),category:$("#category").value,memo:$("#memo").value.trim(),kind,potId:kind==="pot"?$("#potSelect").value:null,createdAt:Date.now()});$("#amount").value="";$("#memo").value="";save()};
 document.addEventListener("click",e=>{let id=e.target.dataset.del;if(id){data.deletedExpenseIds=[...new Set([...(data.deletedExpenseIds||[]),id])];data.expenses=data.expenses.filter(x=>x.id!==id);save()}let dc=e.target.dataset.delcat;if(dc!==undefined&&data.categories.length>1){data.categories.splice(Number(dc),1);save()}let dp=e.target.dataset.delpot;if(dp){data.pots=data.pots.filter(x=>x.id!==dp);save()}let day=e.target.closest("[data-day]")?.dataset.day;if(day){selectedDay=day;renderCalendar()}});
-$("#saveBudget").onclick=()=>{data.weeklyBudget=Math.max(0,Number($("#weeklyBudget").value)||0);if($("#monthlyBudget"))data.monthlyBudget=Math.max(0,Number($("#monthlyBudget").value)||0);save()};
+$("#saveBudget").onclick=()=>{data.weeklyBudget=Math.max(0,Number($("#weeklyBudget").value)||0);save()};
 $("#addCategory").onclick=()=>{let v=$("#newCategory").value.trim();if(v&&!data.categories.includes(v)){data.categories.push(v);$("#newCategory").value="";save()}};
 $("#addPot").onclick=()=>{let n=$("#newPotName").value.trim(),b=Number($("#newPotBudget").value)||0;if(!n)return alert("항목 이름을 입력해줘!");data.pots.push({id:crypto.randomUUID(),name:n,budget:b});$("#newPotName").value="";$("#newPotBudget").value="";save()};
 $("#prevMonth").onclick=()=>{calDate.setMonth(calDate.getMonth()-1);renderCalendar()};$("#nextMonth").onclick=()=>{calDate.setMonth(calDate.getMonth()+1);renderCalendar()};
@@ -81,44 +79,29 @@ const b64=u=>btoa(String.fromCharCode(...u)), unb64=s=>Uint8Array.from(atob(s),c
 async function encryptPayload(obj,pass){let salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await deriveKey(pass,salt),plain=new TextEncoder().encode(JSON.stringify(obj)),ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,plain);return {v:1,salt:b64(salt),iv:b64(iv),cipher:b64(new Uint8Array(ct))}}
 async function decryptPayload(enc,pass){let salt=unb64(enc.salt),iv=unb64(enc.iv),key=await deriveKey(pass,salt),pt=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,unb64(enc.cipher));return JSON.parse(new TextDecoder().decode(pt))}
 async function rpc(name,args){let c=cloud(),r=await fetch(c.url+"/rest/v1/rpc/"+name,{method:"POST",headers:{"Content-Type":"application/json","apikey":c.key,"Authorization":"Bearer "+c.key},body:JSON.stringify(args)});if(!r.ok)throw new Error(await r.text());let t=await r.text();return t?JSON.parse(t):null}
-function normalizeData(x){
- x=x||{};
- return {...defaults,...x,
-   weeklyBudget:Number.isFinite(Number(x.weeklyBudget))?Number(x.weeklyBudget):defaults.weeklyBudget,
-   monthlyBudget:Number.isFinite(Number(x.monthlyBudget))?Number(x.monthlyBudget):defaults.monthlyBudget,
-   categories:Array.isArray(x.categories)?x.categories:defaults.categories,
-   pots:Array.isArray(x.pots)?x.pots:[],
-   expenses:Array.isArray(x.expenses)?x.expenses:[],
-   deletedExpenseIds:Array.isArray(x.deletedExpenseIds)?x.deletedExpenseIds:[],
-   updatedAt:Number(x.updatedAt||0)
- };
-}
 function mergeData(local,remote){
- local=normalizeData(local); remote=remote?normalizeData(remote):null;
- if(!remote)return local;
+ if(!remote)return {...defaults,...local,deletedExpenseIds:local.deletedExpenseIds||[]};
  let deleted=[...new Set([...(local.deletedExpenseIds||[]),...(remote.deletedExpenseIds||[])])];
  let map=new Map();
- [...remote.expenses,...local.expenses].forEach(e=>{if(e&&e.id&&!deleted.includes(e.id)){let prev=map.get(e.id);if(!prev||Number(e.createdAt||0)>=Number(prev.createdAt||0))map.set(e.id,e)}});
- let newer=remote.updatedAt>local.updatedAt?remote:local;
+ [...(remote.expenses||[]),...(local.expenses||[])].forEach(e=>{if(e&&e.id&&!deleted.includes(e.id)){let prev=map.get(e.id);if(!prev||Number(e.createdAt||0)>=Number(prev.createdAt||0))map.set(e.id,e)}});
+ let newer=Number(remote.updatedAt||0)>Number(local.updatedAt||0)?remote:local;
  return {...defaults,...newer,
-   weeklyBudget:Number(newer.weeklyBudget||defaults.weeklyBudget),
-   monthlyBudget:Number(newer.monthlyBudget||defaults.monthlyBudget),
-   categories:[...new Set([...remote.categories,...local.categories])],
-   pots:[...remote.pots,...local.pots].reduce((a,p)=>{if(p&&p.id&&!a.some(x=>x.id===p.id))a.push(p);return a},[]),
+   categories:[...new Set([...(remote.categories||[]),...(local.categories||[])])],
+   pots:[...(remote.pots||[]),...(local.pots||[])].reduce((a,p)=>{if(p&&p.id&&!a.some(x=>x.id===p.id))a.push(p);return a},[]),
    expenses:[...map.values()],
    deletedExpenseIds:deleted,
-   updatedAt:Math.max(local.updatedAt,remote.updatedAt)
+   updatedAt:Math.max(Number(local.updatedAt||0),Number(remote.updatedAt||0))
  };
 }
 let syncTimer;
-function scheduleSync(){clearTimeout(syncTimer);if(cloud().url)syncTimer=setTimeout(()=>syncData(true),900)}
+function scheduleSync(){clearTimeout(syncTimer)}
 async function syncData(silent=false){let c=cloud();if(!c.url||!c.key||!c.syncKey){if(!silent)alert("먼저 동기화 연결 정보를 저장해줘!");return}
  try{setStatus("동기화 중…");let hash=await sha256(c.syncKey),rows=await rpc("money_sync_pull",{p_sync_key_hash:hash}),remote=Array.isArray(rows)&&rows[0]?.payload?await decryptPayload(rows[0].payload,c.syncKey):null;
  let merged=mergeData(data,remote);data=merged;localStorage.setItem(KEY,JSON.stringify(data));
- let enc=await encryptPayload(merged,c.syncKey);await rpc("money_sync_push",{p_sync_key_hash:hash,p_payload:enc});setStatus("동기화 완료");try{render()}catch(renderErr){console.warn("render after sync",renderErr)}if(!silent)alert("동기화 완료!")}
- catch(e){console.error(e);setStatus("동기화 실패");if(!silent)alert("동기화에 실패했어. 기존 연결정보는 그대로 두고 다시 시도해줘. 계속 실패하면 오류를 확인할게.")}}
+ let enc=await encryptPayload(merged,c.syncKey);await rpc("money_sync_push",{p_sync_key_hash:hash,p_payload:enc});setStatus("동기화 완료");render();if(!silent)alert("동기화 완료!")}
+ catch(e){console.error(e);setStatus("동기화 실패");if(!silent)alert("동기화에 실패했어. 연결 정보와 SQL 설정을 확인해줘.")}}
 $("#syncNow").onclick=()=>syncData(false);
-window.addEventListener("focus",()=>{if(cloud().url)syncData(true)});
+window.addEventListener("focus",()=>{});
 
 $("#backup").onclick=()=>{let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`minjeong-money-backup-${today()}.json`;a.click();URL.revokeObjectURL(a.href)};
 $("#restore").onchange=async e=>{try{let obj=JSON.parse(await e.target.files[0].text());if(!confirm("현재 데이터를 백업 파일로 바꿀까?"))return;data={...defaults,...obj,updatedAt:Date.now()};save()}catch{alert("백업 파일을 읽지 못했어.")}};
